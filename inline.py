@@ -1,63 +1,48 @@
-""" inline section button """
-
+from pyrogram import Client, errors
 from pyrogram.types import (
-  CallbackQuery,
-  InlineKeyboardButton,
-  InlineKeyboardMarkup,
-  Message,
+    InlineQuery,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
 )
+from youtubesearchpython import VideosSearch
 
 
-def stream_markup(user_id):
-  buttons = [
-    [
-      InlineKeyboardButton(text="• الـقـائـمـه تحكم♪", callback_data=f'cbmenu | {user_id}'),
-      InlineKeyboardButton(text="• الـتـحـديـثـات♪", url=f'https://t.me/J0KER_7x'),
-    ],
-    [
-    InlineKeyboardButton(
-                        "♡اضـف الـبـوت لـمـجـمـوعـتـك♡",
-                        url=f'https://t.me/Joker7x_bot?startgroup=true'),
-    ],
-  ]
-  return buttons
+@Client.on_inline_query()
+async def inline(client: Client, query: InlineQuery):
+    answers = []
+    search_query = query.query.lower().strip().rstrip()
 
+    if search_query == "":
+        await client.answer_inline_query(
+            query.id,
+            results=answers,
+            switch_pm_text=" يمكنك البحث مباشرة من اليوتيوب",
+            switch_pm_parameter="help",
+            cache_time=0,
+        )
+    else:
+        search = VideosSearch(search_query, limit=50)
 
-def menu_markup(user_id):
-  buttons = [
-    [
-      InlineKeyboardButton(text="⏹", callback_data=f'cbstop | {user_id}'),
-      InlineKeyboardButton(text="⏸", callback_data=f'cbpause | {user_id}'),
-      InlineKeyboardButton(text="▶️", callback_data=f'cbresume | {user_id}'),
-    ],
-    [
-      InlineKeyboardButton(text="🔇", callback_data=f'cbmute | {user_id}'),
-      InlineKeyboardButton(text="🔊", callback_data=f'cbunmute | {user_id}'),
-    ],
-    [
-      InlineKeyboardButton(text="🗑 اغلاق", callback_data='cls'),
-    ]
-  ]
-  return buttons
+        for result in search.result()["result"]:
+            answers.append(
+                InlineQueryResultArticle(
+                    title=result["title"],
+                    description="{}, {} views.".format(
+                        result["duration"], result["viewCount"]["short"]
+                    ),
+                    input_message_content=InputTextMessageContent(
+                        "🔗 https://www.youtube.com/watch?v={}".format(result["id"])
+                    ),
+                    thumb_url=result["thumbnails"][0]["url"],
+                )
+            )
 
-
-close_mark = InlineKeyboardMarkup(
-  [
-    [
-      InlineKeyboardButton(
-        "🔙 رجوع", callback_data="cbmenu"
-      )
-    ]
-  ]
-)
-
-
-back_mark = InlineKeyboardMarkup(
-  [
-    [
-      InlineKeyboardButton(
-        "🔙 رجوع", callback_data="cbmenu"
-      )
-    ]
-  ]
-)
+        try:
+            await query.answer(results=answers, cache_time=0)
+        except errors.QueryIdInvalid:
+            await query.answer(
+                results=answers,
+                cache_time=0,
+                switch_pm_text="خطاء:انتهت مهلة البحث",
+                switch_pm_parameter="",
+            )
